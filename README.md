@@ -505,8 +505,13 @@ Contributions welcome! Please ensure:
 
 ---
 
-**Status**: Development  
-**Version**: 0.1.0  
+**Status**: Production-Ready  
+**Version**: 1.0.0  
 **Last Updated**: December 2025  
-**Created by**: antX (bad-antics)  
-**License**: MIT
+
+**Created by**: antX  
+**Organization**: [Bad Antics](https://github.com/bad-antics)  
+**GitHub Repository**: https://github.com/bad-antics/p2p-chatter  
+**License**: MIT  
+
+©2025 Bad Antics. All rights reserved.

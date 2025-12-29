@@ -2,53 +2,83 @@
 
 ## Project Creator
 
-**antX (bad-antics)**
+**antX**
 
-P2P Chatter - A privacy-focused, decentralized chat application reverse-engineered from Session architecture.
+P2P Chatter - A privacy-focused, decentralized chat application with end-to-end encryption, CAPTCHA bot protection, and peer-to-peer messaging.
+
+**Organization**: [Bad Antics](https://github.com/bad-antics)  
+**Repository**: https://github.com/bad-antics/p2p-chatter  
+**License**: MIT  
+
+---
+
+## Copyright
+
+©2025 Bad Antics. All rights reserved.
 
 ---
 
 ## Technology Stack
 
 ### Core Libraries
-- **Node.js** - JavaScript runtime
+- **Node.js** - JavaScript runtime (v18+)
 - **TypeScript** - Type-safe JavaScript
 - **better-sqlite3** - Local database
-- **libsodium.js** - Cryptography
-- **Express.js** - Web framework (optional)
+- **Crypto (Node.js built-in)** - Cryptography
+- **libp2p** - P2P networking library
 
-### Cryptography
-- **Node.js crypto module** - ECDH, AES-256-GCM, ECDSA
-- **HMAC-SHA256** - Key derivation
-- **prime256v1** - ECDH curve
+### Cryptography Implementations
+- **AES-256-GCM** - Symmetric encryption
+- **ECDH (P-256)** - Key exchange
+- **ECDSA-SHA256** - Digital signatures
+- **HKDF-SHA256** - Key derivation
+- **PBKDF2-SHA256** - Password hashing
 
 ### Architecture Inspiration
-- **Session Messenger** (https://getsession.org/) - Privacy-focused chat
-- **Loki Network** - Onion routing network
-- **Signal Protocol** - Encryption standards
+- **Session Messenger** (https://getsession.org/) - Privacy-focused architecture
+- **Loki Network** - P2P infrastructure concepts
+- **Signal Protocol** - Encryption standards and best practices
 
 ---
 
 ## Key Contributors to Inspiration
 
 ### Session Project
-- The Session team for creating an innovative privacy-focused messaging app
-- Open-source ethos and commitment to decentralization
+- The Session team for pioneering decentralized messaging
+- Open-source commitment to user privacy and security
 
 ### Cryptography Standards
-- Signal Protocol documentation and best practices
-- NIST P-256 / prime256v1 specifications
-- GCM authentication tag specifications
+- Signal Protocol documentation
+- NIST standards (P-256, AES, HMAC)
+- GCM authentication specifications
 - ECDSA signing standards
+- PBKDF2 specifications
 
-### Open Source Libraries
+### Open Source Community
 - Node.js core team
 - better-sqlite3 maintainers
-- libp2p community
+- libp2p community and contributors
 
 ---
 
-## Design Principles
+## Version History
+
+- **v1.0.0** (December 2025) - Production release with full feature set
+  - Core P2P messaging
+  - End-to-end encryption
+  - CAPTCHA bot protection
+  - User authentication
+  - Message persistence
+  - Desktop application (Electron)
+
+---
+
+## Support
+
+For bugs, feature requests, or contributions, visit:  
+https://github.com/bad-antics/p2p-chatter
+
+---## Design Principles
 
 This project was built with the following principles:
 

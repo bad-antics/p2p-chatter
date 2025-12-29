@@ -1,9 +1,9 @@
 {
   "name": "p2p-chatter",
-  "version": "0.1.0",
-  "description": "P2P chat application with end-to-end encryption, inspired by Session",
+  "version": "1.0.0",
+  "description": "P2P chat application with end-to-end encryption, CAPTCHA bot protection, and decentralized messaging",
   "main": "dist/index.js",
-  "author": "antX (bad-antics)",
+  "author": "antX (creator) | Bad Antics (https://github.com/bad-antics)",
   "scripts": {
     "dev": "nodemon --exec ts-node src/index.ts",
     "build": "tsc",
@@ -17,10 +17,11 @@
     "chat",
     "encrypted",
     "messaging",
-    "libp2p",
-    "signal-protocol"
+    "decentralized",
+    "e2e-encryption",
+    "captcha",
+    "security"
   ],
-  "author": "bad-antics",
   "license": "MIT",
   "dependencies": {
     "@libp2p/core": "^2.0.0",
