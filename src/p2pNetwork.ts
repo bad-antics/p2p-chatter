@@ -3,10 +3,12 @@
  * Created by antX | Organization: Bad Antics (https://github.com/bad-antics)
  * ©2025 Bad Antics. All rights reserved.
  * 
- * Handles peer-to-peer networking and message routing
+ * Handles peer-to-peer networking, message routing, and Tor/VPN integration
  */
 
 import pino from 'pino';
+import TorService, { ConnectionMode } from './torService';
+import { EventEmitter } from 'events';
 
 const logger = pino({ name: 'P2PNetwork' });
 
@@ -28,13 +30,100 @@ export interface NetworkMessage {
   signature: string;
 }
 
-export class P2PNetwork {
+export class P2PNetwork extends EventEmitter {
   private peers: Map<string, PeerInfo> = new Map();
   private messageHandlers: Map<string, Function> = new Map();
   private isConnected: boolean = false;
+  private torService = TorService;
+  private connectionMode: 'direct' | 'tor' | 'vpn' | 'tor+vpn' = 'direct';
 
   constructor() {
+    super();
     logger.info('P2P Network initialized');
+    this.setupTorHandlers();
+  }
+
+  /**
+   * Setup Tor service event handlers
+   */
+  private setupTorHandlers(): void {
+    this.torService.on('tor-enabled', (config) => {
+      logger.info('Tor enabled for P2P routing');
+      this.emit('tor-enabled', config);
+    });
+
+    this.torService.on('vpn-enabled', (config) => {
+      logger.info('VPN enabled for P2P routing');
+      this.emit('vpn-enabled', config);
+    });
+
+    this.torService.on('connected', (info) => {
+      logger.info('Network tunnel established', info);
+      this.emit('tunnel-established', info);
+    });
+
+    this.torService.on('disconnected', () => {
+      logger.info('Network tunnel disconnected');
+      this.emit('tunnel-disconnected');
+    });
+  }
+
+  /**
+   * Set connection mode (direct, Tor, VPN, or Tor+VPN)
+   */
+  setConnectionMode(mode: 'direct' | 'tor' | 'vpn' | 'tor+vpn'): void {
+    this.connectionMode = mode;
+    this.torService.setConnectionMode(mode);
+    logger.info({ mode }, 'P2P connection mode changed');
+    this.emit('mode-changed', { mode });
+  }
+
+  /**
+   * Get current connection mode
+   */
+  getConnectionMode(): {
+    mode: string;
+    status: any;
+    optimization: any;
+  } {
+    return {
+      mode: this.connectionMode,
+      status: this.torService.getConnectionStatus(),
+      optimization: this.torService.getRoutingOptimization(),
+    };
+  }
+
+  /**
+   * Connect to P2P network with selected tunnel
+   */
+  async connect(peerId: string): Promise<boolean> {
+    try {
+      logger.info({ peerId, mode: this.connectionMode }, 'Connecting to P2P network');
+
+      // Connect Tor/VPN tunnel if enabled
+      if (this.connectionMode !== 'direct') {
+        await this.torService.connect();
+      }
+
+      this.isConnected = true;
+      logger.info('P2P network connected');
+      this.emit('connected', { peerId, mode: this.connectionMode });
+      return true;
+    } catch (error) {
+      logger.error(error, 'P2P connection failed');
+      this.emit('connection-failed', { error });
+      return false;
+    }
+  }
+
+  /**
+   * Disconnect from P2P network
+   */
+  async disconnect(): Promise<void> {
+    logger.info('Disconnecting from P2P network');
+    await this.torService.disconnect();
+    this.isConnected = false;
+    this.emit('disconnected');
   }
 
   /**

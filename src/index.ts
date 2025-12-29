@@ -15,6 +15,8 @@ import { IdentityManager, UserProfile } from './identity';
 import { EncryptionManager, EncryptedMessage } from './encryption';
 import { MessageStore, Message } from './messageStore';
 import { P2PNetwork, NetworkMessage, PeerInfo } from './p2pNetwork';
+import TorService from './torService';
+import UsernameGenerator from './usernameGenerator';
 import { v4 as uuidv4 } from 'uuid';
 
 const logger = pino({ name: 'P2PChatter' });
@@ -24,6 +26,8 @@ export class P2PChatter {
   private messageStore: MessageStore;
   private network: P2PNetwork;
   private currentUser: UserProfile | null = null;
+  private torService = TorService;
+  private usernameGenerator = UsernameGenerator;
 
   constructor(
     identityDbPath: string = './data/identity.db',
@@ -34,7 +38,65 @@ export class P2PChatter {
     this.network = new P2PNetwork();
 
     this.setupMessageHandlers();
-    logger.info('P2P Chatter initialized');
+    logger.info('P2P Chatter initialized with Tor/VPN support');
+  }
+
+  /**
+   * Set network connection mode (direct, Tor, VPN, or Tor+VPN)
+   */
+  setNetworkMode(mode: 'direct' | 'tor' | 'vpn' | 'tor+vpn'): void {
+    logger.info({ mode }, 'Setting network mode');
+    this.network.setConnectionMode(mode);
+  }
+
+  /**
+   * Get current network mode and optimization metrics
+   */
+  getNetworkStatus(): any {
+    return this.network.getConnectionMode();
+  }
+
+  /**
+   * Generate auto-login credentials (single-use)
+   */
+  generateAutoLoginCredentials(): {
+    username: string;
+    password: string;
+    sessionId: string;
+  } {
+    const creds = this.usernameGenerator.generateSingleUseCredentials();
+    logger.info(
+      { username: creds.username, expiresAt: creds.expiresAt },
+      'Auto-login credentials generated'
+    );
+    return {
+      username: creds.username,
+      password: creds.password,
+      sessionId: creds.sessionId
+    };
+  }
+
+  /**
+   * Generate multiple auto-login credentials
+   */
+  generateBatchCredentials(count: number): Array<{
+    username: string;
+    password: string;
+    sessionId: string;
+  }> {
+    const batch = this.usernameGenerator.generateBatch(count);
+    return batch.map(creds => ({
+      username: creds.username,
+      password: creds.password,
+      sessionId: creds.sessionId
+    }));
+  }
+
+  /**
+   * Get generator statistics
+   */
+  getCredentialsStatistics(): any {
+    return this.usernameGenerator.getStatistics();
   }
 
   /**
@@ -392,3 +454,13 @@ export async function main(): Promise<void> {
 if (require.main === module) {
   main();
 }
+
+// Export main classes and services
+export { P2PChatter };
+export { TorService };
+export { UsernameGenerator };
+export { IdentityManager };
+export { EncryptionManager };
+export { MessageStore };
+export { P2PNetwork };
+

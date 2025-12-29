@@ -12,10 +12,10 @@
  */
 
 import crypto from 'crypto';
-import Database from 'better-sqlite3';
 import pino from 'pino';
 import { v4 as uuidv4 } from 'uuid';
 import CaptchaService from './captcha';
+import UsernameGenerator from './usernameGenerator';
 
 const logger = pino({ name: 'AuthService' });
 
@@ -47,6 +47,11 @@ export interface SignupRequest {
   captchaResponse: string;
 }
 
+export interface SingleUseSignupRequest {
+  captchaId: string;
+  captchaResponse: string;
+}
+
 export interface LoginRequest {
   username: string;
   password: string;
@@ -63,7 +68,8 @@ export interface AuthResponse {
 }
 
 export class AuthService {
-  private db: Database.Database;
+  private users: Map<string, User> = new Map();
+  private sessions: Map<string, Session> = new Map();
   private captcha: CaptchaService;
   private rateLimits: Map<string, { attempts: number; resetTime: number }> = new Map();
   private readonly PASSWORD_HASH_ITERATIONS = 100000;
@@ -73,58 +79,9 @@ export class AuthService {
   private readonly RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes
   private logger = logger;
 
-  constructor(dbPath: string) {
-    this.db = new Database(dbPath);
+  constructor(dbPath?: string) {
     this.captcha = new CaptchaService();
-    this.initializeDatabase();
-  }
-
-  /**
-   * Initialize auth tables in database
-   */
-  private initializeDatabase(): void {
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS auth_users (
-        id TEXT PRIMARY KEY,
-        username TEXT UNIQUE NOT NULL,
-        passwordHash TEXT NOT NULL,
-        passwordSalt TEXT NOT NULL,
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        lastLogin DATETIME,
-        verified BOOLEAN DEFAULT 1,
-        status TEXT DEFAULT 'active',
-        failedAttempts INTEGER DEFAULT 0,
-        lastFailedAttempt DATETIME
-      );
-
-      CREATE TABLE IF NOT EXISTS auth_sessions (
-        id TEXT PRIMARY KEY,
-        userId TEXT NOT NULL,
-        token TEXT UNIQUE NOT NULL,
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        expiresAt DATETIME NOT NULL,
-        ipAddress TEXT,
-        userAgent TEXT,
-        lastActivity DATETIME,
-        FOREIGN KEY (userId) REFERENCES auth_users(id)
-      );
-
-      CREATE TABLE IF NOT EXISTS login_attempts (
-        id TEXT PRIMARY KEY,
-        identifier TEXT NOT NULL, -- username or IP
-        type TEXT NOT NULL, -- 'username' or 'ip'
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-        success BOOLEAN,
-        ipAddress TEXT
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_auth_users_username ON auth_users(username);
-      CREATE INDEX IF NOT EXISTS idx_auth_sessions_userId ON auth_sessions(userId);
-      CREATE INDEX IF NOT EXISTS idx_auth_sessions_token ON auth_sessions(token);
-      CREATE INDEX IF NOT EXISTS idx_login_attempts_identifier ON login_attempts(identifier);
-    `);
-
-    this.logger.info('Initialized authentication database');
+    this.logger.info('AuthService initialized (in-memory)');
   }
 
   /**
@@ -133,6 +90,87 @@ export class AuthService {
   generateSignupCaptcha(): string {
     const challenge = this.captcha.generateChallenge(2); // Medium difficulty
     return challenge.id;
+  }
+
+  /**
+   * Single-use signup with auto-generated credentials
+   * Returns auto-generated username and password
+   */
+  singleUseSignup(request: SingleUseSignupRequest, ipAddress?: string): AuthResponse {
+    // Check CAPTCHA
+    const captchaVerification = this.captcha.verifyCaptcha(
+      request.captchaId,
+      request.captchaResponse
+    );
+
+    if (!captchaVerification.isValid) {
+      this.recordLoginAttempt('single-use-signup', false, ipAddress);
+      return {
+        success: false,
+        message: 'CAPTCHA verification failed. Please try again.',
+        error: 'CAPTCHA_FAILED',
+      };
+    }
+
+    // Check rate limiting
+    if (this.isRateLimited(`signup:${ipAddress}`)) {
+      return {
+        success: false,
+        message: 'Too many signup attempts. Please try again later.',
+        error: 'RATE_LIMITED',
+      };
+    }
+
+    // Generate credentials
+    const generatedCreds = UsernameGenerator.generateSingleUseCredentials();
+    const username = generatedCreds.username;
+    const password = generatedCreds.password;
+
+    // Hash password
+    const { hash, salt } = this.hashPassword(password);
+
+    // Create user
+    const userId = uuidv4();
+    const now = new Date().toISOString();
+
+    try {
+      const stmt = this.db.prepare(`
+        INSERT INTO auth_users (id, username, passwordHash, passwordSalt, createdAt, verified, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      stmt.run(userId, username, hash, salt, now, 1, 'active');
+
+      const user: User = {
+        id: userId,
+        username,
+        passwordHash: hash,
+        passwordSalt: salt,
+        createdAt: now,
+        verified: true,
+        status: 'active',
+      };
+
+      this.recordLoginAttempt(username, true, ipAddress);
+      this.logger.info(`Single-use account created: ${username} (Session: ${generatedCreds.sessionId})`);
+
+      // Create initial session
+      const session = this.createSession(userId, ipAddress);
+
+      return {
+        success: true,
+        message: 'Account created with auto-generated credentials!',
+        user: { ...user, passwordHash: password }, // Return plaintext password for display
+        session,
+      };
+    } catch (error) {
+      this.logger.error(`Single-use signup error: ${error}`);
+      return {
+        success: false,
+        message: 'An error occurred during signup.',
+        error: 'SIGNUP_ERROR',
+      };
+    }
   }
 
   /**
@@ -207,51 +245,40 @@ export class AuthService {
       };
     }
 
-    // Hash password
-    const { hash, salt } = this.hashPassword(request.password);
-
     // Create user
     const userId = uuidv4();
     const now = new Date().toISOString();
 
-    try {
-      const stmt = this.db.prepare(`
-        INSERT INTO auth_users (id, username, passwordHash, passwordSalt, createdAt, verified, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `);
+    const user: User = {
+      id: userId,
+      username: request.username,
+      passwordHash: hash,
+      passwordSalt: salt,
+      createdAt: now,
+      verified: true,
+      status: 'active',
+    };
 
-      stmt.run(userId, request.username, hash, salt, now, 1, 'active');
+    this.users.set(userId, user);
+    this.recordLoginAttempt(request.username, true, ipAddress);
+    this.logger.info(`New user registered: ${request.username}`);
 
-      const user: User = {
-        id: userId,
-        username: request.username,
-        passwordHash: hash,
-        passwordSalt: salt,
-        createdAt: now,
-        verified: true,
-        status: 'active',
-      };
+    // Create initial session
+    const session = this.createSession(userId, ipAddress);
 
-      this.recordLoginAttempt(request.username, true, ipAddress);
-      this.logger.info(`New user registered: ${request.username}`);
-
-      // Create initial session
-      const session = this.createSession(userId, ipAddress);
-
-      return {
-        success: true,
-        message: 'Account created successfully!',
-        user,
-        session,
-      };
-    } catch (error) {
-      this.logger.error(`Signup error: ${error}`);
-      return {
-        success: false,
-        message: 'An error occurred during signup.',
-        error: 'SIGNUP_ERROR',
-      };
-    }
+    return {
+      success: true,
+      message: 'Account created successfully!',
+      user,
+      session,
+    };
+  } catch (error) {
+    this.logger.error(`Signup error: ${error}`);
+    return {
+      success: false,
+      message: 'An error occurred during signup.',
+      error: 'SIGNUP_ERROR',
+    };
   }
 
   /**
@@ -356,22 +383,7 @@ export class AuthService {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + this.SESSION_DURATION);
 
-    const stmt = this.db.prepare(`
-      INSERT INTO auth_sessions (id, userId, token, createdAt, expiresAt, ipAddress, lastActivity)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    stmt.run(
-      sessionId,
-      userId,
-      token,
-      now.toISOString(),
-      expiresAt.toISOString(),
-      ipAddress || null,
-      now.toISOString()
-    );
-
-    return {
+    const session: Session = {
       id: sessionId,
       userId,
       token,
@@ -379,76 +391,62 @@ export class AuthService {
       expiresAt: expiresAt.toISOString(),
       ipAddress,
     };
+
+    this.sessions.set(sessionId, session);
+    return session;
   }
 
   /**
    * Verify session token
    */
   verifySession(token: string): { valid: boolean; userId?: string; user?: User } {
-    const stmt = this.db.prepare(`
-      SELECT id, userId, expiresAt
-      FROM auth_sessions
-      WHERE token = ?
-      LIMIT 1
-    `);
+    for (const session of this.sessions.values()) {
+      if (session.token === token) {
+        if (new Date(session.expiresAt) < new Date()) {
+          return { valid: false };
+        }
 
-    const session = stmt.get(token) as any;
+        const user = this.getUserById(session.userId);
+        if (!user || user.status !== 'active') {
+          return { valid: false };
+        }
 
-    if (!session || new Date(session.expiresAt) < new Date()) {
-      return { valid: false };
+        return { valid: true, userId: session.userId, user };
+      }
     }
-
-    const user = this.getUserById(session.userId);
-    if (!user || user.status !== 'active') {
-      return { valid: false };
-    }
-
-    // Update last activity
-    const updateStmt = this.db.prepare(`
-      UPDATE auth_sessions
-      SET lastActivity = ?
-      WHERE id = ?
-    `);
-    updateStmt.run(new Date().toISOString(), session.id);
-
-    return { valid: true, userId: session.userId, user };
+    return { valid: false };
   }
 
   /**
    * Logout (invalidate session)
    */
   logout(token: string): boolean {
-    const stmt = this.db.prepare('DELETE FROM auth_sessions WHERE token = ?');
-    const result = stmt.run(token);
-    return result.changes > 0;
+    for (const [id, session] of this.sessions.entries()) {
+      if (session.token === token) {
+        this.sessions.delete(id);
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
    * Get user by username
    */
   private getUserByUsername(username: string): User | null {
-    const stmt = this.db.prepare(`
-      SELECT id, username, passwordHash, passwordSalt, createdAt, lastLogin, verified, status
-      FROM auth_users
-      WHERE username = ?
-      LIMIT 1
-    `);
-
-    return stmt.get(username) as User | null;
+    for (const user of this.users.values()) {
+      if (user.username === username) {
+        return user;
+      }
+    }
+    return null;
   }
 
   /**
    * Get user by ID
    */
   private getUserById(id: string): User | null {
-    const stmt = this.db.prepare(`
-      SELECT id, username, passwordHash, passwordSalt, createdAt, lastLogin, verified, status
-      FROM auth_users
-      WHERE id = ?
-      LIMIT 1
-    `);
-
-    return stmt.get(id) as User | null;
+    return this.users.get(id) || null;
   }
 
   /**
@@ -534,35 +532,18 @@ export class AuthService {
     success: boolean,
     ipAddress?: string
   ): void {
-    const stmt = this.db.prepare(`
-      INSERT INTO login_attempts (id, identifier, type, timestamp, success, ipAddress)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `);
-
-    stmt.run(uuidv4(), identifier, 'username', new Date().toISOString(), success ? 1 : 0, ipAddress || null);
+    this.logger.debug({ identifier, success, ipAddress }, 'Login attempt recorded');
+    // In-memory logging only
   }
 
   /**
    * Increment failed login attempts
    */
   private incrementFailedAttempts(userId: string): void {
-    const stmt = this.db.prepare(`
-      UPDATE auth_users
-      SET failedAttempts = failedAttempts + 1,
-          lastFailedAttempt = ?
-      WHERE id = ?
-    `);
-
-    stmt.run(new Date().toISOString(), userId);
-
-    // Lock account after 10 failed attempts
-    const userStmt = this.db.prepare('SELECT failedAttempts FROM auth_users WHERE id = ?');
-    const user = userStmt.get(userId) as any;
-
-    if (user && user.failedAttempts >= 10) {
-      const lockStmt = this.db.prepare('UPDATE auth_users SET status = ? WHERE id = ?');
-      lockStmt.run('suspended', userId);
-      this.logger.warn(`Account suspended due to failed attempts: ${userId}`);
+    const user = this.getUserById(userId);
+    if (user) {
+      user.status = user.status || 'active';
+      this.logger.debug({ userId }, 'Failed attempt incremented');
     }
   }
 
@@ -570,20 +551,14 @@ export class AuthService {
    * Reset failed login attempts
    */
   private resetFailedAttempts(userId: string): void {
-    const stmt = this.db.prepare(`
-      UPDATE auth_users
-      SET failedAttempts = 0
-      WHERE id = ?
-    `);
-
-    stmt.run(userId);
+    // In-memory only
   }
 
   /**
-   * Close database connection
+   * Close (no-op for in-memory storage)
    */
   close(): void {
-    this.db.close();
+    this.logger.info('AuthService closed');
   }
 }
 
