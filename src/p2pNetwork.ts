@@ -129,9 +129,10 @@ export class P2PNetwork extends EventEmitter {
   /**
    * Register a message handler
    */
-  on(messageType: string, handler: (message: NetworkMessage) => void): void {
+  registerHandler(messageType: string, handler: (message: NetworkMessage) => void): P2PNetwork {
     this.messageHandlers.set(messageType, handler);
     logger.debug({ messageType }, 'Handler registered');
+    return this;
   }
 
   /**
@@ -196,23 +197,6 @@ export class P2PNetwork extends EventEmitter {
       peer.lastSeen = Date.now();
       logger.debug({ peerId, status }, 'Peer status updated');
     }
-  }
-
-  /**
-   * Connect to the P2P network
-   */
-  async connect(nodeId: string): Promise<void> {
-    logger.info({ nodeId }, 'Connecting to P2P network');
-    this.isConnected = true;
-    // Implementation would go here
-  }
-
-  /**
-   * Disconnect from the P2P network
-   */
-  async disconnect(): Promise<void> {
-    logger.info('Disconnecting from P2P network');
-    this.isConnected = false;
   }
 
   /**

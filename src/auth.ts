@@ -77,27 +77,24 @@ export class AuthService {
   private readonly SESSION_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days
   private readonly RATE_LIMIT_ATTEMPTS = 5;
   private readonly RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes
-  private logger = logger;
 
   constructor(dbPath?: string) {
     this.captcha = new CaptchaService();
-    this.logger.info('AuthService initialized (in-memory)');
+    logger.info('AuthService initialized (in-memory)');
   }
 
   /**
    * Generate CAPTCHA challenge for signup
    */
   generateSignupCaptcha(): string {
-    const challenge = this.captcha.generateChallenge(2); // Medium difficulty
+    const challenge = this.captcha.generateChallenge(2);
     return challenge.id;
   }
 
   /**
    * Single-use signup with auto-generated credentials
-   * Returns auto-generated username and password
    */
   singleUseSignup(request: SingleUseSignupRequest, ipAddress?: string): AuthResponse {
-    // Check CAPTCHA
     const captchaVerification = this.captcha.verifyCaptcha(
       request.captchaId,
       request.captchaResponse
@@ -112,7 +109,6 @@ export class AuthService {
       };
     }
 
-    // Check rate limiting
     if (this.isRateLimited(`signup:${ipAddress}`)) {
       return {
         success: false,
@@ -121,78 +117,42 @@ export class AuthService {
       };
     }
 
-    // Generate credentials
     const generatedCreds = UsernameGenerator.generateSingleUseCredentials();
     const username = generatedCreds.username;
     const password = generatedCreds.password;
-
-    // Hash password
     const { hash, salt } = this.hashPassword(password);
 
-    // Create user
     const userId = uuidv4();
     const now = new Date().toISOString();
 
-    try {
-      const stmt = this.db.prepare(`
-        INSERT INTO auth_users (id, username, passwordHash, passwordSalt, createdAt, verified, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `);
+    const user: User = {
+      id: userId,
+      username,
+      passwordHash: hash,
+      passwordSalt: salt,
+      createdAt: now,
+      verified: true,
+      status: 'active',
+    };
 
-      stmt.run(userId, username, hash, salt, now, 1, 'active');
+    this.users.set(userId, user);
+    this.recordLoginAttempt(username, true, ipAddress);
+    logger.info(`Single-use account created: ${username}`);
 
-      const user: User = {
-        id: userId,
-        username,
-        passwordHash: hash,
-        passwordSalt: salt,
-        createdAt: now,
-        verified: true,
-        status: 'active',
-      };
+    const session = this.createSession(userId, ipAddress);
 
-      this.recordLoginAttempt(username, true, ipAddress);
-      this.logger.info(`Single-use account created: ${username} (Session: ${generatedCreds.sessionId})`);
-
-      // Create initial session
-      const session = this.createSession(userId, ipAddress);
-
-      return {
-        success: true,
-        message: 'Account created with auto-generated credentials!',
-        user: { ...user, passwordHash: password }, // Return plaintext password for display
-        session,
-      };
-    } catch (error) {
-      this.logger.error(`Single-use signup error: ${error}`);
-      return {
-        success: false,
-        message: 'An error occurred during signup.',
-        error: 'SIGNUP_ERROR',
-      };
-    }
-  }
-
-  /**
-   * Generate CAPTCHA challenge for login
-   */
-  generateLoginCaptcha(): string {
-    const challenge = this.captcha.generateChallenge(1); // Easy difficulty
-    return challenge.id;
-  }
-
-  /**
-   * Get CAPTCHA challenge for display
-   */
-  getCaptchaChallenge(captchaId: string): { challenge: string; difficulty: number } | null {
-    return this.captcha.getChallengDisplay(captchaId);
+    return {
+      success: true,
+      message: 'Account created with auto-generated credentials!',
+      user: { ...user, passwordHash: password },
+      session,
+    };
   }
 
   /**
    * Register a new user
    */
   signup(request: SignupRequest, ipAddress?: string): AuthResponse {
-    // Validate username
     if (!this.isValidUsername(request.username)) {
       return {
         success: false,
@@ -201,7 +161,6 @@ export class AuthService {
       };
     }
 
-    // Validate password
     if (!this.isValidPassword(request.password)) {
       return {
         success: false,
@@ -210,7 +169,6 @@ export class AuthService {
       };
     }
 
-    // Check CAPTCHA
     const captchaVerification = this.captcha.verifyCaptcha(
       request.captchaId,
       request.captchaResponse
@@ -225,7 +183,6 @@ export class AuthService {
       };
     }
 
-    // Check rate limiting
     if (this.isRateLimited(`signup:${ipAddress}`)) {
       return {
         success: false,
@@ -234,7 +191,6 @@ export class AuthService {
       };
     }
 
-    // Check if username already exists
     const existingUser = this.getUserByUsername(request.username);
     if (existingUser) {
       this.recordLoginAttempt(request.username, false, ipAddress);
@@ -245,9 +201,9 @@ export class AuthService {
       };
     }
 
-    // Create user
     const userId = uuidv4();
     const now = new Date().toISOString();
+    const { hash, salt } = this.hashPassword(request.password);
 
     const user: User = {
       id: userId,
@@ -261,9 +217,8 @@ export class AuthService {
 
     this.users.set(userId, user);
     this.recordLoginAttempt(request.username, true, ipAddress);
-    this.logger.info(`New user registered: ${request.username}`);
+    logger.info(`New user registered: ${request.username}`);
 
-    // Create initial session
     const session = this.createSession(userId, ipAddress);
 
     return {
@@ -272,20 +227,12 @@ export class AuthService {
       user,
       session,
     };
-  } catch (error) {
-    this.logger.error(`Signup error: ${error}`);
-    return {
-      success: false,
-      message: 'An error occurred during signup.',
-      error: 'SIGNUP_ERROR',
-    };
   }
 
   /**
    * Login with username and password
    */
   login(request: LoginRequest, ipAddress?: string): AuthResponse {
-    // Check rate limiting
     if (this.isRateLimited(`login:${request.username}`)) {
       return {
         success: false,
@@ -302,7 +249,6 @@ export class AuthService {
       };
     }
 
-    // Get user
     const user = this.getUserByUsername(request.username);
     if (!user) {
       this.recordLoginAttempt(request.username, false, ipAddress);
@@ -313,7 +259,6 @@ export class AuthService {
       };
     }
 
-    // Check account status
     if (user.status !== 'active') {
       return {
         success: false,
@@ -322,7 +267,6 @@ export class AuthService {
       };
     }
 
-    // Verify password
     if (!this.verifyPassword(request.password, user.passwordHash, user.passwordSalt)) {
       this.incrementFailedAttempts(user.id);
       this.recordLoginAttempt(request.username, false, ipAddress);
@@ -333,7 +277,6 @@ export class AuthService {
       };
     }
 
-    // Verify CAPTCHA if provided (for suspicious activity)
     if (request.captchaId && request.captchaResponse) {
       const captchaVerification = this.captcha.verifyCaptcha(
         request.captchaId,
@@ -349,22 +292,12 @@ export class AuthService {
       }
     }
 
-    // Reset failed attempts
     this.resetFailedAttempts(user.id);
     this.recordLoginAttempt(request.username, true, ipAddress);
 
-    // Update last login
-    const stmt = this.db.prepare(`
-      UPDATE auth_users
-      SET lastLogin = ?
-      WHERE id = ?
-    `);
-    stmt.run(new Date().toISOString(), user.id);
-
-    // Create session
     const session = this.createSession(user.id, ipAddress);
 
-    this.logger.info(`User logged in: ${request.username}`);
+    logger.info(`User logged in: ${request.username}`);
 
     return {
       success: true,
@@ -418,7 +351,7 @@ export class AuthService {
   }
 
   /**
-   * Logout (invalidate session)
+   * Logout
    */
   logout(token: string): boolean {
     for (const [id, session] of this.sessions.entries()) {
@@ -532,33 +465,28 @@ export class AuthService {
     success: boolean,
     ipAddress?: string
   ): void {
-    this.logger.debug({ identifier, success, ipAddress }, 'Login attempt recorded');
-    // In-memory logging only
+    logger.debug({ identifier, success, ipAddress }, 'Login attempt recorded');
   }
 
   /**
    * Increment failed login attempts
    */
   private incrementFailedAttempts(userId: string): void {
-    const user = this.getUserById(userId);
-    if (user) {
-      user.status = user.status || 'active';
-      this.logger.debug({ userId }, 'Failed attempt incremented');
-    }
+    logger.debug({ userId }, 'Failed attempt incremented');
   }
 
   /**
    * Reset failed login attempts
    */
   private resetFailedAttempts(userId: string): void {
-    // In-memory only
+    logger.debug({ userId }, 'Failed attempts reset');
   }
 
   /**
-   * Close (no-op for in-memory storage)
+   * Close
    */
   close(): void {
-    this.logger.info('AuthService closed');
+    logger.info('AuthService closed');
   }
 }
 

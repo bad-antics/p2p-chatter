@@ -9,9 +9,9 @@
 import crypto from 'crypto';
 import pino from 'pino';
 
-/**
- * Encrypted Message Interface
- */
+const logger = pino({ name: 'Encryption' });
+
+export interface EncryptedMessage {
   ciphertext: string;
   nonce: string;
   senderPublicKey: string;

@@ -12,7 +12,6 @@
 
 import crypto from 'crypto';
 import pino from 'pino';
- */
 
 const logger = pino({ name: 'EnhancedEncryption' });
 

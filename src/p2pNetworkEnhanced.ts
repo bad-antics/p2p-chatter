@@ -13,10 +13,6 @@
 import EventEmitter from 'events';
 import pino from 'pino';
 import { v4 as uuidv4 } from 'uuid';
- * - Presence management
- * - Broadcasting
- * - Multi-hop routing
- */
 
 const logger = pino({ name: 'EnhancedP2PNetwork' });
 

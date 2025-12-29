@@ -8,7 +8,6 @@
 
 import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
-import Database from 'better-sqlite3';
 import pino from 'pino';
 
 const logger = pino({ name: 'Identity' });
@@ -28,54 +27,25 @@ export interface IdentityKeyPair {
   privateKey: string;
 }
 
+export interface Contact {
+  id: string;
+  userId: string;
+  contactId: string;
+  username: string;
+  publicKey: string;
+  displayName: string;
+  addedAt: number;
+  verified: boolean;
+}
+
 export class IdentityManager {
-  private db: Database.Database;
+  private users: Map<string, UserProfile> = new Map();
+  private contacts: Map<string, Contact> = new Map();
+  private contactsByUser: Map<string, Contact[]> = new Map();
   private currentUser: UserProfile | null = null;
 
-  constructor(dbPath: string = './data/identity.db') {
-    this.db = new Database(dbPath);
-    this.initializeDatabase();
-  }
-
-  /**
-   * Initialize database tables
-   */
-  private initializeDatabase(): void {
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY,
-        username TEXT NOT NULL UNIQUE,
-        publicKey TEXT NOT NULL,
-        privateKey TEXT NOT NULL,
-        createdAt INTEGER NOT NULL,
-        profilePicture TEXT,
-        status TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS contacts (
-        id TEXT PRIMARY KEY,
-        userId TEXT NOT NULL,
-        contactId TEXT NOT NULL,
-        username TEXT NOT NULL,
-        publicKey TEXT NOT NULL,
-        displayName TEXT,
-        addedAt INTEGER NOT NULL,
-        verified BOOLEAN DEFAULT 0,
-        FOREIGN KEY (userId) REFERENCES users(id),
-        UNIQUE(userId, contactId)
-      );
-
-      CREATE TABLE IF NOT EXISTS sessions (
-        id TEXT PRIMARY KEY,
-        userId TEXT NOT NULL,
-        contactId TEXT NOT NULL,
-        sharedSecret TEXT NOT NULL,
-        messageCount INTEGER DEFAULT 0,
-        createdAt INTEGER NOT NULL,
-        FOREIGN KEY (userId) REFERENCES users(id),
-        FOREIGN KEY (contactId) REFERENCES contacts(contactId)
-      );
-    `);
+  constructor(dbPath?: string) {
+    logger.info('IdentityManager initialized (in-memory)');
   }
 
   /**
@@ -111,12 +81,8 @@ export class IdentityManager {
     profile.profilePicture = profilePicture;
     profile.status = status;
 
-    const stmt = this.db.prepare(`
-      INSERT INTO users (id, username, publicKey, privateKey, createdAt, profilePicture, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    stmt.run(profile.id, profile.username, profile.publicKey, profile.privateKey, profile.createdAt, profilePicture, status);
+    this.users.set(profile.id, profile);
+    this.contactsByUser.set(profile.id, []);
     this.currentUser = profile;
     
     logger.info({ userId: profile.id }, 'New user created');
@@ -127,9 +93,7 @@ export class IdentityManager {
    * Load user by ID
    */
   loadUser(userId: string): UserProfile | null {
-    const stmt = this.db.prepare('SELECT * FROM users WHERE id = ?');
-    const user = stmt.get(userId) as any;
-    
+    const user = this.users.get(userId);
     if (user) {
       this.currentUser = user;
       return user;
@@ -157,41 +121,50 @@ export class IdentityManager {
       .update(contactPublicKey)
       .digest('hex');
 
-    const stmt = this.db.prepare(`
-      INSERT INTO contacts (id, userId, contactId, username, publicKey, displayName, addedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
+    const contact: Contact = {
+      id: uuidv4(),
+      userId: this.currentUser.id,
+      contactId,
+      username,
+      publicKey: contactPublicKey,
+      displayName: displayName || username,
+      addedAt: Date.now(),
+      verified: false
+    };
 
-    stmt.run(uuidv4(), this.currentUser.id, contactId, username, contactPublicKey, displayName || username, Date.now());
-    logger.info({ contactId, username }, 'Contact added');
+    this.contacts.set(contactId, contact);
     
+    if (!this.contactsByUser.has(this.currentUser.id)) {
+      this.contactsByUser.set(this.currentUser.id, []);
+    }
+    this.contactsByUser.get(this.currentUser.id)!.push(contact);
+    
+    logger.info({ contactId, username }, 'Contact added');
     return contactId;
   }
 
   /**
    * Get all contacts for current user
    */
-  getContacts(): any[] {
+  getContacts(): Contact[] {
     if (!this.currentUser) {
       throw new Error('No user logged in');
     }
 
-    const stmt = this.db.prepare('SELECT * FROM contacts WHERE userId = ?');
-    return stmt.all(this.currentUser.id) as any[];
+    return this.contactsByUser.get(this.currentUser.id) || [];
   }
 
   /**
    * Get contact by ID
    */
-  getContact(contactId: string): any {
-    const stmt = this.db.prepare('SELECT * FROM contacts WHERE contactId = ?');
-    return stmt.get(contactId);
+  getContact(contactId: string): Contact | undefined {
+    return this.contacts.get(contactId);
   }
 
   /**
-   * Close database connection
+   * Close (no-op for in-memory implementation)
    */
   close(): void {
-    this.db.close();
+    logger.info('IdentityManager closed');
   }
 }

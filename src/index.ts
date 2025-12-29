@@ -17,7 +17,11 @@ import { MessageStore, Message } from './messageStore';
 import { P2PNetwork, NetworkMessage, PeerInfo } from './p2pNetwork';
 import TorService from './torService';
 import UsernameGenerator from './usernameGenerator';
+import { DatabaseManager } from './database';
+import { LocalChatServer } from './localServer';
 import { v4 as uuidv4 } from 'uuid';
+import fs from 'fs';
+import path from 'path';
 
 const logger = pino({ name: 'P2PChatter' });
 
@@ -28,17 +32,26 @@ export class P2PChatter {
   private currentUser: UserProfile | null = null;
   private torService = TorService;
   private usernameGenerator = UsernameGenerator;
+  private db: DatabaseManager;
+  private localServer: LocalChatServer | null = null;
+  private dataDir: string = './data';
 
   constructor(
     identityDbPath: string = './data/identity.db',
-    messageDbPath: string = './data/messages.db'
+    messageDbPath: string = './data/messages.db',
+    serverPort: number = 3000
   ) {
     this.identity = new IdentityManager(identityDbPath);
     this.messageStore = new MessageStore(messageDbPath);
     this.network = new P2PNetwork();
+    this.db = new DatabaseManager(this.dataDir);
+    
+    // Initialize local server
+    this.localServer = new LocalChatServer(serverPort, this.db);
 
     this.setupMessageHandlers();
-    logger.info('P2P Chatter initialized with Tor/VPN support');
+    this.setupCleanupHandlers();
+    logger.info({ port: serverPort }, 'P2P Chatter initialized with local server and SQLite database');
   }
 
   /**
@@ -106,6 +119,91 @@ export class P2PChatter {
     this.network.on('message', (msg: NetworkMessage) => this.handleIncomingMessage(msg));
     this.network.on('presence', (msg: NetworkMessage) => this.handlePresenceUpdate(msg));
     this.network.on('acknowledgement', (msg: NetworkMessage) => this.handleAcknowledgement(msg));
+  }
+
+  /**
+   * Setup cleanup handlers for graceful shutdown and data wiping
+   */
+  private setupCleanupHandlers(): void {
+    const cleanup = async () => {
+      logger.info('Initiating cleanup sequence...');
+      await this.shutdown();
+      
+      // Wipe all data directories
+      setTimeout(() => {
+        this.wipeAllData();
+        process.exit(0);
+      }, 1000);
+    };
+
+    process.on('SIGINT', cleanup);
+    process.on('SIGTERM', cleanup);
+    process.on('exit', () => {
+      if (fs.existsSync(this.dataDir)) {
+        this.wipeAllData();
+      }
+    });
+  }
+
+  /**
+   * Securely wipe all data (users, messages, logs, credentials)
+   */
+  private wipeAllData(): void {
+    try {
+      logger.info('Wiping all sensitive data...');
+      
+      // Wipe database
+      if (this.db) {
+        this.db.wipeAllData();
+      }
+
+      // Wipe data directory
+      if (fs.existsSync(this.dataDir)) {
+        const files = fs.readdirSync(this.dataDir);
+        for (const file of files) {
+          const filePath = path.join(this.dataDir, file);
+          const stat = fs.statSync(filePath);
+          
+          if (stat.isFile()) {
+            // Overwrite file with random data before deleting
+            const fileSize = stat.size;
+            const randomData = require('crypto').randomBytes(fileSize);
+            fs.writeFileSync(filePath, randomData);
+            fs.unlinkSync(filePath);
+          } else if (stat.isDirectory()) {
+            this.wipeDirectory(filePath);
+          }
+        }
+        fs.rmdirSync(this.dataDir);
+      }
+
+      logger.info('Data wiped successfully');
+    } catch (error) {
+      logger.error({ error }, 'Failed to wipe data');
+    }
+  }
+
+  /**
+   * Recursively wipe directory
+   */
+  private wipeDirectory(dir: string): void {
+    if (!fs.existsSync(dir)) return;
+    
+    const files = fs.readdirSync(dir);
+    for (const file of files) {
+      const filePath = path.join(dir, file);
+      const stat = fs.statSync(filePath);
+      
+      if (stat.isFile()) {
+        const fileSize = stat.size;
+        const randomData = require('crypto').randomBytes(fileSize);
+        fs.writeFileSync(filePath, randomData);
+        fs.unlinkSync(filePath);
+      } else if (stat.isDirectory()) {
+        this.wipeDirectory(filePath);
+      }
+    }
+    fs.rmdirSync(dir);
   }
 
   /**
@@ -416,35 +514,55 @@ export class P2PChatter {
       await this.publishPresence('offline');
     }
 
+    // Stop local server
+    if (this.localServer) {
+      await this.localServer.stop();
+    }
+
     await this.network.disconnect();
     this.identity.close();
     this.messageStore.close();
+    this.db.close();
+  }
+
+  /**
+   * Start local server
+   */
+  async startLocalServer(): Promise<void> {
+    if (this.localServer) {
+      await this.localServer.start();
+      logger.info('Local chat server started');
+    }
+  }
+
+  /**
+   * Get local server instance
+   */
+  getLocalServer(): LocalChatServer | null {
+    return this.localServer;
+  }
+
+  /**
+   * Get database instance
+   */
+  getDatabase(): DatabaseManager {
+    return this.db;
   }
 }
 
 // Main entry point
 export async function main(): Promise<void> {
   try {
-    const app = new P2PChatter();
+    const app = new P2PChatter('./data/identity.db', './data/messages.db', 3000);
+
+    // Start local server
+    await app.startLocalServer();
 
     // Example: Create new account
     const user = await app.createAccount('Alice', undefined, 'Hey, this is Alice!');
     console.log('Created user:', user.username);
 
-    // Example: Add contact (would be done via QR code or public key sharing)
-    // const contactId = app.addContact(bobPublicKey, 'Bob', 'Bob (Work)');
-
-    // Example: Send message
-    // const messageId = await app.sendMessage(contactId, 'Hello Bob!');
-
-    // Example: Get messages
-    // const messages = app.getConversationMessages(contactId);
-
-    // Graceful shutdown
-    process.on('SIGINT', async () => {
-      await app.shutdown();
-      process.exit(0);
-    });
+    logger.info('P2P Chatter is running. Connect via http://localhost:3000');
   } catch (error) {
     logger.error(error, 'Fatal error');
     process.exit(1);
@@ -456,7 +574,6 @@ if (require.main === module) {
 }
 
 // Export main classes and services
-export { P2PChatter };
 export { TorService };
 export { UsernameGenerator };
 export { IdentityManager };
