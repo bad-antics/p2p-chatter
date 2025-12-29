@@ -383,3 +383,21 @@ Made with ❤️ by [Bad Antics](https://github.com/bad-antics)
 [⬆ Back to top](#p2p-chatter)
 
 </div>
+
+
+---
+
+**Created by antX**  
+**Organization:** [Bad Antics](https://github.com/bad-antics)  
+**Repository:** https://github.com/bad-antics/p2p-chatter  
+
+2025 Bad Antics. All rights reserved.
+
+
+---
+
+**Created by antX**  
+**Organization:** [Bad Antics](https://github.com/bad-antics)  
+**Repository:** https://github.com/bad-antics/p2p-chatter  
+
+2025 Bad Antics. All rights reserved.
