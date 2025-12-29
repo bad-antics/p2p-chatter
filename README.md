@@ -1,6 +1,13 @@
 # P2P Chatter - Peer-to-Peer Chat Application
 
-A privacy-focused, decentralized chat application inspired by Session. Reverse engineered architecture with end-to-end encryption, peer-to-peer networking, and local message storage.
+[![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen?logo=node.js)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/typescript-%3E%3D5.0.0-blue?logo=typescript)](https://www.typescriptlang.org/)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Contributions](https://img.shields.io/badge/contributions-welcome-brightgreen)](CONTRIBUTING.md)
+
+A privacy-focused, decentralized chat application with end-to-end encryption, peer-to-peer networking, CAPTCHA bot protection, and local message storage.
+
+**Status**: Actively Developed | **Last Updated**: December 2025
 
 ## 🎯 Features
 
