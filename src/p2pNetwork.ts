@@ -1,9 +1,12 @@
-import pino from 'pino';
-
 /**
  * P2P Chatter - P2P Network Layer
+ * Created by antX | Organization: Bad Antics (https://github.com/bad-antics)
+ * ©2025 Bad Antics. All rights reserved.
+ * 
  * Handles peer-to-peer networking and message routing
  */
+
+import pino from 'pino';
 
 const logger = pino({ name: 'P2PNetwork' });
 

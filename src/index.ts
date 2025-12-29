@@ -1,10 +1,13 @@
 /**
  * P2P Chatter - Main Application
+ * Created by antX | Organization: Bad Antics (https://github.com/bad-antics)
+ * ©2025 Bad Antics. All rights reserved.
+ * 
  * Orchestrates identity, encryption, messaging, and P2P networking
  * 
- * Created by: antX (bad-antics)
  * License: MIT
- * Version: 0.1.0
+ * Version: 1.0.0
+ * GitHub: https://github.com/bad-antics/p2p-chatter
  */
 
 import pino from 'pino';

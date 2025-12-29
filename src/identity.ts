@@ -1,12 +1,15 @@
+/**
+ * P2P Chatter - User Identity Management Module
+ * Created by antX | Organization: Bad Antics (https://github.com/bad-antics)
+ * ©2025 Bad Antics. All rights reserved.
+ * 
+ * Handles user profiles, keys, and identity verification
+ */
+
 import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import Database from 'better-sqlite3';
 import pino from 'pino';
-
-/**
- * P2P Chatter - User Identity Management
- * Handles user profiles, keys, and identity verification
- */
 
 const logger = pino({ name: 'Identity' });
 

@@ -1,10 +1,13 @@
-import pino from 'pino';
-import Database from 'better-sqlite3';
-
 /**
- * P2P Chatter - Message Storage
+ * P2P Chatter - Message Storage Module
+ * Created by antX | Organization: Bad Antics (https://github.com/bad-antics)
+ * ©2025 Bad Antics. All rights reserved.
+ * 
  * Handles message persistence and retrieval
  */
+
+import pino from 'pino';
+import Database from 'better-sqlite3';
 
 const logger = pino({ name: 'MessageStore' });
 

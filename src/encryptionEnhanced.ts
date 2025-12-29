@@ -1,13 +1,17 @@
-import crypto from 'crypto';
-import pino from 'pino';
-
 /**
  * P2P Chatter - Enhanced Encryption Module
+ * Created by antX | Organization: Bad Antics (https://github.com/bad-antics)
+ * ©2025 Bad Antics. All rights reserved.
+ * 
  * Implements dual-layer encryption:
  * 1. Message-level: ECDH + AES-256-GCM (end-to-end)
  * 2. Packet-level: PacketRouter encryption from Packet-Cypher-Action
  * 
  * This provides defense-in-depth with two independent encryption layers
+ */
+
+import crypto from 'crypto';
+import pino from 'pino';
  */
 
 const logger = pino({ name: 'EnhancedEncryption' });

@@ -1,14 +1,17 @@
+/**
+ * P2P Chatter - Encryption Module
+ * Created by antX | Organization: Bad Antics (https://github.com/bad-antics)
+ * ©2025 Bad Antics. All rights reserved.
+ * 
+ * Handles message encryption/decryption using AES-256-GCM and ECDSA signatures
+ */
+
 import crypto from 'crypto';
 import pino from 'pino';
 
 /**
- * P2P Chatter - Encryption Module
- * Handles message encryption/decryption using libsodium (similar to Session)
+ * Encrypted Message Interface
  */
-
-const logger = pino({ name: 'Encryption' });
-
-export interface EncryptedMessage {
   ciphertext: string;
   nonce: string;
   senderPublicKey: string;

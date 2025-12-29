@@ -1,12 +1,15 @@
-import crypto from 'crypto';
-import pino from 'pino';
-import { v4 as uuidv4 } from 'uuid';
-
 /**
- * Simple CAPTCHA Implementation
+ * P2P Chatter - CAPTCHA Module
+ * Created by antX | Organization: Bad Antics (https://github.com/bad-antics)
+ * ©2025 Bad Antics. All rights reserved.
+ * 
  * Challenge-response based bot protection
  * No external dependencies required
  */
+
+import crypto from 'crypto';
+import pino from 'pino';
+import { v4 as uuidv4 } from 'uuid';
 
 const logger = pino({ name: 'CaptchaService' });
 

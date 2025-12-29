@@ -1,13 +1,18 @@
-import EventEmitter from 'events';
-import pino from 'pino';
-import { v4 as uuidv4 } from 'uuid';
-
 /**
- * Enhanced P2P Network Module
+ * P2P Chatter - Enhanced P2P Network Module
+ * Created by antX | Organization: Bad Antics (https://github.com/bad-antics)
+ * ©2025 Bad Antics. All rights reserved.
+ * 
  * Supports:
  * - Direct peer-to-peer messaging
  * - Group messaging
  * - Peer discovery
+ * - Network optimization
+ */
+
+import EventEmitter from 'events';
+import pino from 'pino';
+import { v4 as uuidv4 } from 'uuid';
  * - Presence management
  * - Broadcasting
  * - Multi-hop routing

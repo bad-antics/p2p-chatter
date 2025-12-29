@@ -1,11 +1,8 @@
-import crypto from 'crypto';
-import Database from 'better-sqlite3';
-import pino from 'pino';
-import { v4 as uuidv4 } from 'uuid';
-import CaptchaService from './captcha';
-
 /**
- * Authentication Module
+ * P2P Chatter - Authentication Module
+ * Created by antX | Organization: Bad Antics (https://github.com/bad-antics)
+ * ©2025 Bad Antics. All rights reserved.
+ * 
  * Features:
  * - Username/password authentication (no email required)
  * - CAPTCHA bot protection
@@ -13,6 +10,12 @@ import CaptchaService from './captcha';
  * - Session management
  * - Rate limiting per IP/username
  */
+
+import crypto from 'crypto';
+import Database from 'better-sqlite3';
+import pino from 'pino';
+import { v4 as uuidv4 } from 'uuid';
+import CaptchaService from './captcha';
 
 const logger = pino({ name: 'AuthService' });
 

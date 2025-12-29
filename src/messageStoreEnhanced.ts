@@ -1,13 +1,18 @@
-import Database from 'better-sqlite3';
-import { v4 as uuidv4 } from 'uuid';
-import pino from 'pino';
-
 /**
- * Enhanced Message Store with Group Support
+ * P2P Chatter - Enhanced Message Store Module
+ * Created by antX | Organization: Bad Antics (https://github.com/bad-antics)
+ * ©2025 Bad Antics. All rights reserved.
+ * 
  * Features:
  * - Group messaging (multiple participants)
  * - Message reactions (emoji)
  * - File sharing with encryption
+ * - Advanced persistence and indexing
+ */
+
+import Database from 'better-sqlite3';
+import { v4 as uuidv4 } from 'uuid';
+import pino from 'pino';
  * - Typing indicators
  * - Message threading (replies)
  */
