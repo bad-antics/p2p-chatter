@@ -1,0 +1,35 @@
+{
+    "scripts":  {
+                    "start":  "node dist/index.js",
+                    "build":  "tsc",
+                    "dev":  "ts-node src/index.ts",
+                    "test":  "jest"
+                },
+    "description":  "Decentralized P2P messaging with encryption and CAPTCHA",
+    "dependencies":  {
+                         "events":  "^3.3.0",
+                         "better-sqlite3":  "^9.0.0",
+                         "crypto":  "builtin"
+                     },
+    "types":  "dist/index.d.ts",
+    "version":  "1.0.0",
+    "author":  "Bad Antics",
+    "name":  "p2p-chatter",
+    "main":  "dist/index.js",
+    "devDependencies":  {
+                            "jest":  "^29.0.0",
+                            "typescript":  "^5.0.0",
+                            "ts-jest":  "^29.0.0",
+                            "@types/jest":  "^29.0.0",
+                            "@types/node":  "^20.0.0",
+                            "ts-node":  "^10.0.0"
+                        },
+    "license":  "MIT",
+    "keywords":  [
+                     "p2p",
+                     "messaging",
+                     "encryption",
+                     "decentralized",
+                     "captcha"
+                 ]
+}
