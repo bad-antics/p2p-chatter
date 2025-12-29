@@ -478,6 +478,10 @@ Contributions welcome! Please ensure:
 
 ## 📖 References
 
+### Related Projects
+- [Packet Cypher Action](https://github.com/bad-antics/Packet-Cypher-Action) - Companion packet encryption library
+- See [RELATED_PROJECTS.md](RELATED_PROJECTS.md) for full ecosystem overview
+
 ### Security
 - [ECDH Key Exchange](https://en.wikipedia.org/wiki/Elliptic_curve_Diffie%E2%80%93Hellman)
 - [AES-256-GCM](https://en.wikipedia.org/wiki/Galois/Counter_Mode)
