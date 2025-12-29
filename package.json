@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "P2P chat application with end-to-end encryption, inspired by Session",
   "main": "dist/index.js",
+  "author": "antX (bad-antics)",
   "scripts": {
     "dev": "nodemon --exec ts-node src/index.ts",
     "build": "tsc",

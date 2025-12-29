@@ -1,14 +1,18 @@
+/**
+ * P2P Chatter - Main Application
+ * Orchestrates identity, encryption, messaging, and P2P networking
+ * 
+ * Created by: antX (bad-antics)
+ * License: MIT
+ * Version: 0.1.0
+ */
+
 import pino from 'pino';
 import { IdentityManager, UserProfile } from './identity';
 import { EncryptionManager, EncryptedMessage } from './encryption';
 import { MessageStore, Message } from './messageStore';
 import { P2PNetwork, NetworkMessage, PeerInfo } from './p2pNetwork';
 import { v4 as uuidv4 } from 'uuid';
-
-/**
- * P2P Chatter - Main Application
- * Orchestrates identity, encryption, messaging, and P2P networking
- */
 
 const logger = pino({ name: 'P2PChatter' });
 

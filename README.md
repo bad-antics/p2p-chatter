@@ -496,4 +496,6 @@ Contributions welcome! Please ensure:
 
 **Status**: Development  
 **Version**: 0.1.0  
-**Last Updated**: December 2025
+**Last Updated**: December 2025  
+**Created by**: antX (bad-antics)  
+**License**: MIT

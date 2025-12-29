@@ -372,6 +372,7 @@ Your P2P Chatter foundation is complete. The architecture is solid, the code is 
 **Version**: 0.1.0  
 **Status**: Development Ready  
 **License**: MIT  
+**Created by**: antX (bad-antics)  
 **Location**: `W:\pc123\Documents\p2p chatter\`  
 **Git**: Initialized and committed  
 **Created**: December 29, 2025
